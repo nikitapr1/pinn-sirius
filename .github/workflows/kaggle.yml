@@ -1,0 +1,85 @@
+name: Kaggle CPU checks
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  commits:
+    if: github.event.deleted != true
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - name: Select every commit in this push
+        id: select
+        env:
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import json, os
+          event = json.load(open(os.environ['GITHUB_EVENT_PATH']))
+          commits = list(dict.fromkeys(c['id'] for c in event.get('commits', [])))
+          if not commits:
+              commits = [os.environ['HEAD_SHA']]
+          # GitHub matrices allow at most 256 jobs; fail rather than silently skip commits.
+          if len(commits) > 256:
+              raise SystemExit('Push exceeds 256 commits; split the push or submit checks manually.')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write('matrix=' + json.dumps({'sha': commits}) + '\n')
+          PY
+
+  kaggle:
+    name: CPU ${{ matrix.sha }}
+    needs: commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.commits.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install controller
+        run: python -m pip install kaggle==2.2.5 six
+      - name: Validate Kaggle secret
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        run: |
+          if [ -z "$KAGGLE_API_TOKEN" ]; then
+            echo '::error::Add KAGGLE_API_TOKEN in repository Settings → Secrets and variables → Actions.'
+            exit 1
+          fi
+      - name: Run pinned commit in private offline Kaggle CPU session
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        run: >-
+          python scripts/kaggle_run.py
+          --repository "$REPOSITORY"
+          --entrypoint kaggle/smoke_test.py
+          --max-training-minutes 5
+          --wait --timeout-minutes 18
+      - name: Summarize submission
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              for path in Path('.kaggle-runs').glob('*/submission.json'):
+                  run = json.loads(path.read_text())
+                  f.write(f"Kaggle: https://www.kaggle.com/code/{run['kernel']}\n\nCommit: `{run['commit']}`\n\n")
+                  for manifest in path.parent.glob('output/run-manifest.json'):
+                      result = json.loads(manifest.read_text())
+                      f.write(f"Status: {result['status']}; CPU; internet disabled.\n")
+          PY
