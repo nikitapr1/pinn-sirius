@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Submit exactly one explicit run. Git commits alone never trigger Kaggle."""
+import base64
 import argparse
 import datetime
 import json
@@ -18,6 +19,7 @@ def main():
     parser.add_argument('--entrypoint', default='kaggle/smoke_test.py')
     parser.add_argument('--revision', default='HEAD')
     parser.add_argument('--repository', default='nikitapr1/pinn-sirius')
+    parser.add_argument('--internet', action='store_true', help='Opt into network access; default is offline')
     parser.add_argument('--gpu', action='store_true', help='Explicitly opt into GPU quota consumption')
     parser.add_argument('--requirements', help='Optional requirements file; built-in packages are preferred')
     parser.add_argument('--wheelhouse', help='Optional /kaggle/input/... directory containing prepared wheels')
@@ -40,11 +42,17 @@ def main():
             if Path(name).is_absolute() or '..' in Path(name).parts:
                 parser.error('Entrypoint and requirements must be repository-relative paths')
             git('cat-file', '-e', sha + ':' + name)
+    if args.requirements and not args.wheelhouse and not args.internet:
+        parser.error('Offline dependency installation requires --wheelhouse, or explicitly enable --internet')
     # Validate that the public source is already available before reserving Kaggle compute.
     import urllib.request
     with urllib.request.urlopen(f'https://api.github.com/repos/{args.repository}/commits/{sha}', timeout=30) as r:
         if json.load(r)['sha'] != sha:
             raise RuntimeError('Remote commit mismatch')
+    with urllib.request.urlopen(f'https://api.github.com/repos/{args.repository}/zipball/{sha}', timeout=60) as r:
+        archive = r.read(750001)
+    if len(archive) > 750000:
+        parser.error('Code snapshot exceeds 750 KB: move data/weights to a Kaggle Dataset before submitting')
     from kaggle import api
     owner = api.get_config_value(api.CONFIG_NAME_USER)
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d-%H%M%S')
@@ -56,14 +64,16 @@ def main():
                   requirements=args.requirements, wheelhouse=args.wheelhouse,
                   args=args.training_args[1:] if args.training_args[:1] == ['--'] else args.training_args,
                   gpu=args.gpu, datasets=args.dataset, checkpoint_kernels=args.checkpoint_kernel,
-                  max_training_minutes=args.max_training_minutes)
+                  max_training_minutes=args.max_training_minutes, internet=args.internet)
     bootstrap = (ROOT / 'kaggle/bootstrap.py').read_text()
-    (folder / 'main.py').write_text('RUN_CONFIG = ' + repr(config) + '\n' + bootstrap)
+    (folder / 'main.py').write_text('RUN_CONFIG = ' + repr(config) + '\nSOURCE_ARCHIVE = ' + repr(base64.b64encode(archive).decode()) + '\n' + bootstrap)
     metadata = dict(id=ref, title=slug, code_file='main.py', language='python', kernel_type='script',
-                    is_private=True, enable_gpu=args.gpu, enable_internet=True,
+                    is_private=True, enable_gpu=args.gpu, enable_internet=args.internet,
                     dataset_sources=args.dataset, competition_sources=[], kernel_sources=args.checkpoint_kernel)
     (folder / 'kernel-metadata.json').write_text(json.dumps(metadata, indent=2))
-    result = api.kernels_push(str(folder))
+    result = api.kernels_push(str(folder), timeout=str(int((args.max_training_minutes + 10) * 60)))
+    if getattr(result, 'error', None):
+        raise RuntimeError(str(result.error))
     print(result)
     print('https://www.kaggle.com/code/' + ref, flush=True)
     (folder / 'submission.json').write_text(json.dumps(dict(kernel=ref, **config), indent=2))

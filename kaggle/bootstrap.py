@@ -1,4 +1,7 @@
 """Executed in Kaggle; RUN_CONFIG is prepended by scripts/kaggle_run.py."""
+import base64
+import io
+import zipfile
 import datetime
 import json
 import os
@@ -18,13 +21,19 @@ def main(config):
     def run(args):
         subprocess.run(args, cwd=source, check=True)
     try:
-        run(['git', 'init', '-q'])
-        run(['git', 'remote', 'add', 'origin', 'https://github.com/' + config['repository'] + '.git'])
-        run(['git', 'fetch', '-q', '--depth=1', 'origin', config['commit']])
-        run(['git', 'checkout', '-q', '--detach', 'FETCH_HEAD'])
-        actual = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=source, text=True).strip()
-        if actual != config['commit']:
-            raise RuntimeError('Downloaded commit does not match requested commit')
+        archive = zipfile.ZipFile(io.BytesIO(base64.b64decode(SOURCE_ARCHIVE)))
+        prefix = archive.namelist()[0].split('/')[0] + '/'
+        for item in archive.infolist():
+            relative = item.filename.removeprefix(prefix)
+            target = (source / relative).resolve()
+            if not target.is_relative_to(source.resolve()):
+                raise RuntimeError('Unsafe path in source archive')
+            if item.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(archive.read(item))
+        actual = config['commit']
         os.environ['OUTPUT_DIR'] = str(output)
         os.environ['INPUT_DIR'] = '/kaggle/input'
         os.environ['RUN_COMMIT'] = actual
