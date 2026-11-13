@@ -1,0 +1,65 @@
+{
+  "source_archive": "PINN_data_cases.zip → PINN_SEIR/PINN_SEIR_Almaty.rar",
+  "files": [
+    {
+      "name": "NSK_data.csv",
+      "bytes": 62374,
+      "sha256": "62272b814c5c8a4b94645f318629bfa1c3cf26af3d37dbc57ea60653a0e30183",
+      "location": "external-input"
+    },
+    {
+      "name": "PINN_SEIR_example.py",
+      "bytes": 5999,
+      "sha256": "a545821fdde7577a81389598d2221d5fc73f0b362c0d270d5150adc4d102af63",
+      "location": "github"
+    },
+    {
+      "name": "PINN_school.py",
+      "bytes": 16879,
+      "sha256": "27275ea2f8943e4a58f6eeaab15daae78f2561d9c4608cd2c0af26915a0ebc22",
+      "location": "github"
+    },
+    {
+      "name": "PINN_tools.py",
+      "bytes": 4924,
+      "sha256": "954484b949eaaed66475342e7f42f48df25469cd8eda25f48eb0123304bdc62c",
+      "location": "github"
+    },
+    {
+      "name": "altay-region-data.csv",
+      "bytes": 44699,
+      "sha256": "d9055add8bbe4e31339fb47a69abe9f2cb7a03c6726226363b614dca1a6f561b",
+      "location": "external-input"
+    },
+    {
+      "name": "cases_kazakhstan.csv",
+      "bytes": 553483,
+      "sha256": "afcdba0ee2b715b12597d590499937928db0a4457556171a0d3647b0847fd2d5",
+      "location": "external-input"
+    },
+    {
+      "name": "mos_data.csv",
+      "bytes": 92559,
+      "sha256": "d15c7c8bb13056d74c715b8cbc4272ce71a4284550cfab2e1b55203c6ad12ee9",
+      "location": "external-input"
+    },
+    {
+      "name": "omsk-region-data.csv",
+      "bytes": 44384,
+      "sha256": "4c2ea13463d0c47967ab0ab729398d5be7bf0d6c2acea050a9693711e77ec0e2",
+      "location": "external-input"
+    },
+    {
+      "name": "pinn_seir_1.pth",
+      "bytes": 409161,
+      "sha256": "a935182999044b12911d3c17c37308e56abd7d0f3517c7d564cfc077e1ca62c5",
+      "location": "external-input"
+    },
+    {
+      "name": "spb_data.csv",
+      "bytes": 67530,
+      "sha256": "9ac62af12826ba4a0147568269861a15c76a108d0e4b1f1947ddade98197aacb",
+      "location": "external-input"
+    }
+  ]
+}

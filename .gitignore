@@ -7,3 +7,7 @@ __pycache__/
 *.pt
 *.pth
 *.safetensors
+
+# Original model inputs remain outside the public repository.
+PINN_SEIR_Almaty/*.csv
+PINN_SEIR_Almaty/result_*.png
